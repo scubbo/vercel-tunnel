@@ -1,14 +1,23 @@
 import request from "supertest";
 import { WebSocket } from "ws";
 import { createTunnelServer, ServerInstance } from "./main";
+import crypto from "crypto";
+
+function generateHmacSignature(secret: string, timestamp: number): string {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(timestamp.toString())
+    .digest("hex");
+}
 
 describe("WebSocket Tunnel Server", () => {
   let serverInstance: ServerInstance;
   let port: number;
+  const testSecret = "test-secret-key";
 
   beforeEach((done) => {
-    // Create the tunnel server
-    serverInstance = createTunnelServer();
+    // Create the tunnel server with a secret
+    serverInstance = createTunnelServer(testSecret);
 
     // Start the server on a random port
     serverInstance.server.listen(0, () => {
@@ -28,8 +37,12 @@ describe("WebSocket Tunnel Server", () => {
   });
 
   test("should proxy request through WebSocket tunnel", (done) => {
-    // Create WebSocket client that connects to /accept
-    const client = new WebSocket(`ws://localhost:${port}/accept`);
+    // Create WebSocket client that connects to /accept with authentication
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = generateHmacSignature(testSecret, timestamp);
+    const client = new WebSocket(
+      `ws://localhost:${port}/accept?timestamp=${timestamp}&signature=${signature}`,
+    );
 
     client.on("open", () => {
       console.log("Client connected to WebSocket");
@@ -93,7 +106,11 @@ describe("WebSocket Tunnel Server", () => {
   });
 
   test("should handle WebSocket connection and disconnection", (done) => {
-    const client = new WebSocket(`ws://localhost:${port}/accept`);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = generateHmacSignature(testSecret, timestamp);
+    const client = new WebSocket(
+      `ws://localhost:${port}/accept?timestamp=${timestamp}&signature=${signature}`,
+    );
 
     client.on("open", () => {
       // Verify connection is active
@@ -109,5 +126,94 @@ describe("WebSocket Tunnel Server", () => {
         done();
       }, 100);
     });
+  });
+
+  describe("Authentication", () => {
+    test("should reject connection when no auth provided", (done) => {
+      const client = new WebSocket(`ws://localhost:${port}/accept`);
+      let receivedOpen = false;
+
+      client.on("open", () => {
+        receivedOpen = true;
+      });
+
+      client.on("close", (code) => {
+        // Server should close immediately with policy violation
+        expect(code).toBe(1008); // Policy violation
+        // Connection should not be set as active
+        expect(serverInstance.getActiveConnection()).toBeFalsy();
+        done();
+      });
+
+      client.on("error", () => {
+        // Error might occur, that's fine
+      });
+    }, 5000);
+
+    test("should reject connection with invalid signature", (done) => {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const invalidSignature = "invalid-signature-here";
+      const client = new WebSocket(
+        `ws://localhost:${port}/accept?timestamp=${timestamp}&signature=${invalidSignature}`,
+      );
+
+      client.on("open", () => {
+        // Open might fire but connection should close immediately
+      });
+
+      client.on("close", (code) => {
+        expect(code).toBe(1008); // Policy violation
+        // Connection should not be set as active
+        expect(serverInstance.getActiveConnection()).toBeFalsy();
+        done();
+      });
+
+      client.on("error", () => {
+        // Error might occur, that's fine
+      });
+    }, 5000);
+
+    test("should reject connection with stale timestamp", (done) => {
+      // Timestamp from 60 seconds ago (outside the 30-second window)
+      const staleTimestamp = Math.floor(Date.now() / 1000) - 60;
+      const signature = generateHmacSignature(testSecret, staleTimestamp);
+      const client = new WebSocket(
+        `ws://localhost:${port}/accept?timestamp=${staleTimestamp}&signature=${signature}`,
+      );
+
+      client.on("open", () => {
+        // Open might fire but connection should close immediately
+      });
+
+      client.on("close", (code) => {
+        expect(code).toBe(1008); // Policy violation
+        // Connection should not be set as active
+        expect(serverInstance.getActiveConnection()).toBeFalsy();
+        done();
+      });
+
+      client.on("error", () => {
+        // Error might occur, that's fine
+      });
+    }, 5000);
+
+    test("should accept connection with valid HMAC signature", (done) => {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = generateHmacSignature(testSecret, timestamp);
+      const client = new WebSocket(
+        `ws://localhost:${port}/accept?timestamp=${timestamp}&signature=${signature}`,
+      );
+
+      client.on("open", () => {
+        // Connection accepted
+        expect(serverInstance.getActiveConnection()).toBeTruthy();
+        client.close();
+        done();
+      });
+
+      client.on("error", (error) => {
+        done(error);
+      });
+    }, 5000);
   });
 });

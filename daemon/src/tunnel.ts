@@ -1,14 +1,15 @@
-import WebSocket from 'ws';
-import http from 'http';
-import https from 'https';
-import { URL } from 'url';
+import WebSocket from "ws";
+import http from "http";
+import https from "https";
+import { URL } from "url";
+import crypto from "crypto";
 
 export interface TunnelInstance {
   close: () => void;
 }
 
 interface HttpRequest {
-  type: 'http_request';
+  type: "http_request";
   method: string;
   path: string;
   headers: Record<string, string | string[]>;
@@ -17,15 +18,19 @@ interface HttpRequest {
 }
 
 interface HttpResponse {
-  type: 'http_response';
+  type: "http_response";
   status: number;
   headers: Record<string, string | string[]>;
   body: any;
 }
 
-export function createTunnel(targetHostname: string, tunnelUrl: string): TunnelInstance {
+export function createTunnel(
+  targetHostname: string,
+  tunnelUrl: string,
+  secret: string,
+): TunnelInstance {
   // Parse target hostname to extract protocol, host, and port
-  const targetUrl = targetHostname.startsWith('http')
+  const targetUrl = targetHostname.startsWith("http")
     ? targetHostname
     : `http://${targetHostname}`;
   const parsedTarget = new URL(targetUrl);
@@ -33,54 +38,64 @@ export function createTunnel(targetHostname: string, tunnelUrl: string): TunnelI
   // Use the provided tunnel URL directly (should already include /accept)
   const wsUrl = new URL(tunnelUrl);
 
+  // Add authentication
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(timestamp.toString())
+    .digest("hex");
+
+  wsUrl.searchParams.set("timestamp", timestamp.toString());
+  wsUrl.searchParams.set("signature", signature);
+
   console.log(`Connecting to tunnel listener at: ${wsUrl.toString()}`);
 
   // Create WebSocket connection
   const ws = new WebSocket(wsUrl.toString());
 
-  ws.on('open', () => {
-    console.log('✅ Connected to tunnel listener');
+  ws.on("open", () => {
+    console.log("✅ Connected to tunnel listener");
   });
 
-  ws.on('message', (data: Buffer) => {
+  ws.on("message", (data: Buffer) => {
     try {
       const message = JSON.parse(data.toString());
 
-      if (message.type === 'connected') {
-        console.log('🔗 Tunnel connection established');
+      if (message.type === "connected") {
+        console.log("🔗 Tunnel connection established");
         return;
       }
 
-      if (message.type === 'http_request') {
+      if (message.type === "http_request") {
         handleHttpRequest(message as HttpRequest, parsedTarget, ws);
         return;
       }
 
-      console.log('⚠️  Unknown message type:', message.type);
+      console.log("⚠️  Unknown message type:", message.type);
     } catch (error) {
-      console.error('❌ Error parsing WebSocket message:', error);
+      console.error("❌ Error parsing WebSocket message:", error);
     }
   });
 
-  ws.on('close', (code, reason) => {
+  ws.on("close", (code, reason) => {
     console.log(`🔌 WebSocket connection closed: ${code} ${reason.toString()}`);
   });
 
-  ws.on('error', (error) => {
-    console.error('❌ WebSocket error:', error);
+  ws.on("error", (error) => {
+    console.error("❌ WebSocket error:", error);
   });
 
   return {
     close: () => {
       ws.close();
-    }
+    },
   };
 }
 
 function handleHttpRequest(
   request: HttpRequest,
   target: URL,
-  ws: WebSocket
+  ws: WebSocket,
 ): void {
   console.log(`📨 ${request.method} ${request.path}`);
 
@@ -91,7 +106,7 @@ function handleHttpRequest(
   if (request.query && Object.keys(request.query).length > 0) {
     Object.entries(request.query).forEach(([key, value]) => {
       if (Array.isArray(value)) {
-        value.forEach(v => targetUrl.searchParams.append(key, v));
+        value.forEach((v) => targetUrl.searchParams.append(key, v));
       } else {
         targetUrl.searchParams.set(key, value);
       }
@@ -99,15 +114,15 @@ function handleHttpRequest(
   }
 
   // Choose HTTP or HTTPS module based on target protocol
-  const httpModule = target.protocol === 'https:' ? https : http;
+  const httpModule = target.protocol === "https:" ? https : http;
 
   // Prepare request options
   const options: http.RequestOptions = {
     hostname: target.hostname,
-    port: target.port || (target.protocol === 'https:' ? 443 : 80),
+    port: target.port || (target.protocol === "https:" ? 443 : 80),
     path: targetUrl.pathname + targetUrl.search,
     method: request.method,
-    headers: request.headers
+    headers: request.headers,
   };
 
   // Create the request
@@ -115,28 +130,31 @@ function handleHttpRequest(
     // Collect response data
     const responseChunks: Buffer[] = [];
 
-    res.on('data', (chunk) => {
+    res.on("data", (chunk) => {
       responseChunks.push(chunk);
     });
 
-    res.on('end', () => {
+    res.on("end", () => {
       const responseBody = Buffer.concat(responseChunks);
 
       // Determine if response is binary or text
       let body: any;
-      const contentType = res.headers['content-type'] || '';
+      const contentType = res.headers["content-type"] || "";
 
-      if (contentType.includes('application/json')) {
+      if (contentType.includes("application/json")) {
         try {
           body = JSON.parse(responseBody.toString());
         } catch {
           body = responseBody.toString();
         }
-      } else if (contentType.startsWith('text/') || contentType.includes('html')) {
+      } else if (
+        contentType.startsWith("text/") ||
+        contentType.includes("html")
+      ) {
         body = responseBody.toString();
       } else {
         // For binary data, convert to base64
-        body = responseBody.toString('base64');
+        body = responseBody.toString("base64");
       }
 
       // Filter out undefined values from headers
@@ -148,10 +166,10 @@ function handleHttpRequest(
       });
 
       const response: HttpResponse = {
-        type: 'http_response',
+        type: "http_response",
         status: res.statusCode || 200,
         headers: cleanHeaders,
-        body: body
+        body: body,
       };
 
       // Send response back through WebSocket
@@ -163,14 +181,17 @@ function handleHttpRequest(
   });
 
   // Handle request errors
-  req.on('error', (error) => {
-    console.error(`❌ Request error for ${request.method} ${request.path}:`, error.message);
+  req.on("error", (error) => {
+    console.error(
+      `❌ Request error for ${request.method} ${request.path}:`,
+      error.message,
+    );
 
     const errorResponse: HttpResponse = {
-      type: 'http_response',
+      type: "http_response",
       status: 502,
-      headers: { 'content-type': 'application/json' },
-      body: { error: 'Bad Gateway', message: error.message }
+      headers: { "content-type": "application/json" },
+      body: { error: "Bad Gateway", message: error.message },
     };
 
     if (ws.readyState === WebSocket.OPEN) {
@@ -180,7 +201,7 @@ function handleHttpRequest(
 
   // Send request body if present
   if (request.body) {
-    if (typeof request.body === 'string') {
+    if (typeof request.body === "string") {
       req.write(request.body);
     } else if (Buffer.isBuffer(request.body)) {
       req.write(request.body);

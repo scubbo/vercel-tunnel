@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import crypto from "crypto";
+import { IncomingMessage } from "http";
 
 export interface ServerInstance {
   app: express.Application;
@@ -10,7 +12,50 @@ export interface ServerInstance {
   setActiveConnection: (connection: WebSocket | null) => void;
 }
 
-export function createTunnelServer(): ServerInstance {
+const TIMESTAMP_WINDOW_SECONDS = 30;
+
+function validateAuthentication(
+  req: IncomingMessage,
+  secret: string,
+): { valid: boolean; reason?: string } {
+  const url = new URL(req.url || "", `http://${req.headers.host}`);
+  const timestamp = url.searchParams.get("timestamp");
+  const signature = url.searchParams.get("signature");
+
+  if (!timestamp || !signature) {
+    return { valid: false, reason: "Missing timestamp or signature" };
+  }
+
+  // Validate timestamp is within acceptable window
+  const currentTime = Math.floor(Date.now() / 1000);
+  const requestTime = parseInt(timestamp, 10);
+
+  if (isNaN(requestTime)) {
+    return { valid: false, reason: "Invalid timestamp format" };
+  }
+
+  const timeDiff = Math.abs(currentTime - requestTime);
+  if (timeDiff > TIMESTAMP_WINDOW_SECONDS) {
+    return {
+      valid: false,
+      reason: `Timestamp outside ${TIMESTAMP_WINDOW_SECONDS}s window (diff: ${timeDiff}s)`,
+    };
+  }
+
+  // Validate HMAC signature
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(timestamp)
+    .digest("hex");
+
+  if (signature !== expectedSignature) {
+    return { valid: false, reason: "Invalid signature" };
+  }
+
+  return { valid: true };
+}
+
+export function createTunnelServer(secret: string): ServerInstance {
   // Create Express app
   const app = express();
   app.use(express.json());
@@ -35,8 +80,19 @@ export function createTunnelServer(): ServerInstance {
   });
 
   // Handle WebSocket connections on /accept
-  wss.on("connection", (ws: WebSocket) => {
-    console.log("WebSocket connection established");
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    // Validate authentication
+    const authResult = validateAuthentication(req, secret);
+
+    if (!authResult.valid) {
+      console.log(
+        `❌ Authentication failed: ${authResult.reason} from ${req.socket.remoteAddress}`,
+      );
+      ws.close(1008, authResult.reason); // 1008 = Policy Violation
+      return;
+    }
+
+    console.log("✅ WebSocket connection established and authenticated");
     activeConnection = ws;
 
     ws.on("close", () => {
