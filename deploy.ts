@@ -1,3 +1,4 @@
+#!/usr/bin/env node --experimental-strip-types --env-file .env.local
 import ms from "ms";
 import { Sandbox } from "@vercel/sandbox";
 import { setTimeout } from "timers/promises";
@@ -6,14 +7,16 @@ import { spawn } from "child_process";
 async function main() {
   const sandbox = await Sandbox.create({
     source: {
-      // `source` doesn't have a "path" field - so, even if we wanted to use a monorepo, we couldn't.
-      url: "https://github.com/scubbo/vercel-tunnel-listener.git",
+      url: "https://github.com/scubbo/vercel-tunnel.git",
       type: "git",
     },
     // Must be >=2 - IDK why!
     resources: { vcpus: 2 },
-    // Timeout in milliseconds: ms('10m') = 600000
-    // Defaults to 5 minutes. The maximum is 5 hours for Pro/Enterprise, and 45 minutes for Hobby.
+    // Unfortunately, Sandboxes cannot run indefinitely.
+    //
+    // If we wanted indefinite execution, we could have a proxy layer above the listener to:
+    // * initialize Sandboxes when the previous one exits (or - depending on latency requirements - just init on-demand)
+    // * route to the active Sandbox
     timeout: ms("10m"),
     ports: [3000],
     runtime: "node22",
@@ -21,8 +24,8 @@ async function main() {
 
   console.log(`Installing dependencies...`);
   const install = await sandbox.runCommand({
-    cmd: "npm",
-    args: ["install", "--loglevel", "info"],
+    cmd: "pnpm",
+    args: ["-F", "vercel-tunnel-listener", "install", "--loglevel", "info"],
     stderr: process.stderr,
     stdout: process.stdout,
   });
@@ -34,8 +37,8 @@ async function main() {
 
   console.log(`Starting the server...`);
   await sandbox.runCommand({
-    cmd: "npm",
-    args: ["run", "dev"],
+    cmd: "pnpm",
+    args: ["dev:listener"],
     stderr: process.stderr,
     stdout: process.stdout,
     detached: true,

@@ -30,7 +30,7 @@ The Daemon is the component that runs on your local machine (Kubernetes cluster,
 * Connects out to the daemon to form a persistent connections
 * Forwards incoming requests to the Origin server
 
-Assuming your Origin server is running on port 8080, and noting I copied `sb-shovdhxwg50o.vercel.run` from the output above, you can start the Daemon with:
+Assuming your Origin server is running on port 8080, and noting that `sb-shovdhxwg50o.vercel.run` is copied from the output above (i.e. you should use your own value), you can start the Daemon with:
 
 ```bash
 $ pnpm dev:daemon localhost:8080 wss://sb-shovdhxwg50o.vercel.run/accept
