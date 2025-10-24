@@ -1,0 +1,9 @@
+{
+  "buildCommand": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}

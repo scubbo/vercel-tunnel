@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createTunnel } from "./tunnel";
+import { createTunnel } from "./tunnel.js";
 
 function printUsage() {
   console.log("Usage: vercel-tunnel <target-hostname> <tunnel-url>");
@@ -62,6 +62,4 @@ function main() {
   });
 }
 
-if (require.main === module) {
-  main();
-}
+main();

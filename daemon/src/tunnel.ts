@@ -44,7 +44,9 @@ export function createTunnel(
 
   function connect() {
     console.log(`Connecting to tunnel listener at: ${wsUrl.toString()}`);
-    console.log(`HTTPS address ${wsUrl.toString().replace(/^ws/, "https")}`);
+    console.log(
+      `HTTPS address ${wsUrl.toString().replace(/^wss/, "https").replace("/accept", "")}`,
+    );
 
     // Create WebSocket connection
     const ws = new WebSocket(wsUrl.toString());
