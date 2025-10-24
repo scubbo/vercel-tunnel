@@ -1,6 +1,7 @@
 {
   "name": "vercel-tunnel-daemon",
   "version": "0.1.0",
+  "type": "module",
   "description": "CLI utility to connect to vercel-tunnel-listener and forward HTTP requests",
   "main": "dist/index.js",
   "bin": {

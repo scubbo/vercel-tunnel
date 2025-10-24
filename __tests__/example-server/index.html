@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Welcome To My Web Site!!!</title>
+    <style>
+      body {
+        background: linear-gradient(45deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+        font-family: "Comic Sans MS", cursive;
+        margin: 0;
+        padding: 20px;
+        animation: rainbow 5s infinite;
+      }
+
+      @keyframes rainbow {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+
+      h1 {
+        color: red;
+        text-align: center;
+        font-size: 72px;
+        text-shadow:
+          5px 5px 0px yellow,
+          10px 10px 0px lime;
+        animation: blink 1s infinite;
+        transform: rotate(-5deg);
+      }
+
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        25%,
+        75% {
+          opacity: 0.5;
+        }
+      }
+
+      .container {
+        background-color: rgba(255, 255, 255, 0.8);
+        border: 10px dashed #ff1493;
+        padding: 30px;
+        margin: 20px;
+        box-shadow: 20px 20px 0px rgba(0, 0, 0, 0.5);
+      }
+
+      p {
+        color: blue;
+        font-size: 24px;
+        text-align: justify;
+        line-height: 1.2;
+      }
+
+      .passion {
+        color: #ff0000;
+        font-size: 48px;
+        text-align: center;
+        font-weight: bold;
+        background-color: yellow;
+        border: 5px solid purple;
+        padding: 20px;
+        margin: 30px 0;
+        transform: rotate(2deg);
+        box-shadow: 10px 10px 0px orange;
+      }
+
+      marquee {
+        font-size: 36px;
+        color: #00ff00;
+        background-color: #0000ff;
+        padding: 10px;
+        font-weight: bold;
+      }
+
+      .sparkle {
+        display: inline-block;
+        animation: spin 2s infinite linear;
+        font-size: 48px;
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      button {
+        background: linear-gradient(
+          red,
+          orange,
+          yellow,
+          green,
+          blue,
+          indigo,
+          violet
+        );
+        color: white;
+        font-size: 24px;
+        padding: 20px 40px;
+        border: 5px solid black;
+        cursor: pointer;
+        font-family: "Comic Sans MS", cursive;
+        text-shadow: 2px 2px black;
+      }
+
+      button:hover {
+        transform: scale(1.5) rotate(10deg);
+      }
+    </style>
+  </head>
+  <body>
+    <marquee behavior="scroll" direction="right">
+      ★ ✨ ⭐ WELCOME TO MY AWESOME WEBSITE ⭐ ✨ ★
+    </marquee>
+
+    <h1>
+      <span class="sparkle">✨</span> MY WEBSITE <span class="sparkle">✨</span>
+    </h1>
+
+    <div class="container">
+      <p>
+        Hello and WELCOME to my AMAZING web site!!! This is the BEST site on the
+        internet and I made it ALL BY MYSELF!!! I hope you like all the COOL
+        colors and animations I added because they took me FOREVER to make!!!
+      </p>
+
+      <div class="passion">Graphic Design Is My Pasion</div>
+
+      <p>
+        Make sure to scroll down and look at EVERYTHING because there is so much
+        GREAT stuff here!!! I learned HTML and CSS yesterday and now I am
+        basically a professional web developer!!!
+      </p>
+
+      <center>
+        <button onclick="alert('THANKS FOR CLICKING!!!')">CLICK ME!!!</button>
+      </center>
+    </div>
+
+    <marquee behavior="alternate" direction="left">
+      🌟 Under Construction 🌟 Best Viewed In Netscape Navigator 🌟
+    </marquee>
+  </body>
+</html>
